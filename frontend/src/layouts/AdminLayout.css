@@ -1,0 +1,16 @@
+/* Переопределение стилей для админской страницы */
+.admin-page .page-header {
+    color: #FFFFFF !important;
+    text-transform: uppercase !important;
+}
+
+.admin-page .page-header .page-header__title {
+    margin: 0 !important;
+    font-weight: 900 !important;
+    font-size: 3.4rem !important;
+    color: #FFFFFF !important;
+}
+
+.admin-page .page-header .page-header__title span {
+    font-weight: 100 !important;
+}

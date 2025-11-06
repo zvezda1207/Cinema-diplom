@@ -49,12 +49,17 @@ cinema-booking/
 
 ## Модели данных
 
+- **Token** - токены
 - **Hall** - кинозалы
 - **Seat** - места в залах
-- **Movie** - фильмы
-- **Session** - сеансы
-- **Booking** - бронирования
+- **Film** - фильмы
+- **Seance** - сеансы
+- **Ticket** - билеты
+- **Price** - цены
 - **User** - администраторы
+- **AvailableSeat** - свободные места
+- **Booking** - бронирования
+
 
 ## Установка и запуск
 
@@ -139,10 +144,6 @@ npm start
 ## API Endpoints
 
 ### Публичные
-- `GET /` - Welcome message
-- `GET /health` - Health check
-
-### Планируемые endpoints
 - `GET /api/movies` - Список фильмов
 - `GET /api/sessions` - Список сеансов
 - `POST /api/bookings` - Создание бронирования
@@ -176,7 +177,7 @@ npm start
 
 ## Автор
 
-[Ваше имя]
+[Ткачева Ирина]
 
 ## Ссылки
 

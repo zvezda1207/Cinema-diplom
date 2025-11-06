@@ -1,0 +1,28 @@
+/* Переопределение стилей для клиентской страницы */
+.client-page .page-header {
+    color: #000000 !important;
+    text-transform: none !important;
+    padding: 0 !important;
+}
+
+.client-page .page-header .page-header__title {
+    margin: 0.67em 0 !important;
+    font-weight: 700 !important;
+    font-size: 2em !important;
+    color: #000000 !important;
+    text-transform: capitalize !important;
+}
+
+.client-page .page-header .page-header__title span {
+    font-weight: 700 !important;
+}
+
+/* Стили body для клиентской страницы */
+body:has(.client-page) {
+    background-image: url("../assets/layouts/client/i/background.jpg");
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: right;
+    background-color: transparent !important;
+    background-blend-mode: normal !important;
+}

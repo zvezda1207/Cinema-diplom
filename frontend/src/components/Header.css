@@ -1,0 +1,33 @@
+/* Базовые стили Header - переопределяются в Layout */
+.page-header {
+    padding: 0;
+}
+
+.page-header__title-link {
+    text-decoration: none;
+    display: inline-block;
+}
+
+.page-header__title-link:hover,
+.page-header__title-link:focus {
+    color: #000000;
+    text-decoration: none;
+}
+
+.page-header__inner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.page-header__admin-link {
+    font-weight: 500;
+    font-size: 1.6rem;
+    color: #000000;
+    text-decoration: none;
+    text-transform: none;
+}
+
+.page-header__admin-link:hover {
+    text-decoration: underline;
+}

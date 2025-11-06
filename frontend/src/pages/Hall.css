@@ -1,0 +1,28 @@
+/* Стили для страницы выбора мест */
+
+/* Делаем занятые места видимыми */
+.buying-scheme__chair_taken {
+    background-color: #525252 !important;
+    border-color: #777 !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+}
+
+/* Убеждаемся, что места видны */
+.buying-scheme__chair {
+    min-width: 2rem;
+    min-height: 2rem;
+    font-size: 0.8rem;
+    color: #000;
+    cursor: pointer;
+}
+
+.buying-scheme__chair:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Для занятых мест делаем текст видимым */
+.buying-scheme__chair_taken {
+    color: #ccc !important;
+}

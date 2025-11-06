@@ -43,8 +43,11 @@ class BaseUserRequest(BaseModel):
     name: str
     password: str
 
-class CreateUserRequest(BaseUserRequest):
-    pass
+class CreateUserRequest(BaseModel):
+    name: str
+    phone: str
+    email: str
+    password: str
 
 class CreateUserResponse(BaseModel):
     id: int
@@ -63,8 +66,9 @@ class UpdateUserRequest(BaseModel):
     role: str | None = Field(min_length=3, max_length=20)
 
 # Авторизация
-class LoginRequest(BaseUserRequest):
-    pass
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 class LoginResponse(BaseModel):
     token: uuid.UUID
@@ -138,6 +142,8 @@ class DeleteSeanceResponse(SuccessResponse):
 
 # Цены
 class CreatePriceRequest(BaseModel):
+    seance_id: int
+    seat_id: int
     seat_type: str
     price: float
 
@@ -194,6 +200,28 @@ class GetSeatsResponse(BaseModel):
 class DeleteSeatResponse(SuccessResponse):
     pass
 
+# свободные места
+
+class CreateAvailableSeatResponse(BaseModel):
+    id: int
+
+class GetAvailableSeatsResponse(BaseModel):
+    seance_id: int
+    available_seats: list[GetSeatResponse]
+    total_seats: int
+    booked_seats: int
+    available_count: int 
+    
+# бронирования
+class CreateBookingRequest(BaseModel):
+    seance_id: int
+    seat_id: int
+    user_name: str
+    user_phone: str
+    user_email: str
+    qr_code_data: str
+
+
 # Билеты
 class CreateTicketRequest(BaseModel):
     seance_id: int
@@ -206,6 +234,13 @@ class CreateTicketRequest(BaseModel):
 
 class CreateTicketResponse(BaseModel):
     id: int
+    booking_code: str | None = None
+    ticket_id: int | None = None
+    seat_info: dict | None = None
+    seance_info: dict | None = None
+    price: float | None = None
+    qr_code_path: str | None = None
+    message: str | None = None
 
 class UpdateTicketRequest(BaseModel):
     seance_id: int | None = None
@@ -240,3 +275,4 @@ class DeleteTicketResponse(SuccessResponse):
 
 class DeleteUserResponse(SuccessResponse):
     pass
+

@@ -1,5 +1,5 @@
 from sqlalchemy import Integer, String, DateTime, Float, UUID, ForeignKey, func, Text, Boolean
-from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 from datetime import datetime
 import uuid
@@ -7,9 +7,26 @@ import uuid
 from . import config 
 from .custom_type import ROLE
 
-engine = create_async_engine(config.PG_DSN)
+# КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: настраиваем connection pool для производительности
+engine = create_async_engine(
+    config.PG_DSN,
+    pool_size=10,  # Количество соединений в пуле (уменьшено для стабильности)
+    max_overflow=5,  # Дополнительные соединения при перегрузке
+    pool_pre_ping=False,  # Отключаем pre-ping для скорости (может быть проблемой при разрыве соединений)
+    pool_recycle=3600,  # Переиспользование соединений каждый час
+    pool_timeout=30,  # Таймаут ожидания соединения из пула
+    echo=False,  # Отключаем SQL логирование для производительности
+    connect_args={
+        "server_settings": {
+            "application_name": "cinema_booking",
+            "tcp_keepalives_idle": "600",
+            "tcp_keepalives_interval": "30",
+            "tcp_keepalives_count": "3",
+        }
+    }
+)
 
-Session = async_sessionmaker(bind=engine, expire_on_commit=False)
+Session = async_sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 
 
 class Base(DeclarativeBase, AsyncAttrs):
@@ -59,14 +76,15 @@ class Hall(Base):
 class Seat(Base):
     __tablename__ = 'seats'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    hall_id: Mapped[int] = mapped_column(Integer, ForeignKey('halls.id'), nullable=False)
+    hall_id: Mapped[int] = mapped_column(Integer, ForeignKey('halls.id'), nullable=False, index=True)
     row_number: Mapped[int] = mapped_column(Integer, nullable=False)
     seat_number: Mapped[int] = mapped_column(Integer, nullable=False)
     seat_type: Mapped[str] = mapped_column(String(20), default='standart')
 
     hall: Mapped['Hall'] = relationship('Hall', lazy='joined', back_populates='seats')
     tickets: Mapped[list['Ticket']] = relationship('Ticket', lazy='joined', back_populates='seat')
-    
+    available_seats: Mapped[list['AvailableSeat']] = relationship('AvailableSeat', lazy='joined', back_populates='seat')
+    bookings: Mapped[list['Booking']] = relationship('Booking', lazy='joined', back_populates='seat')
 
     @property
     def dict(self):
@@ -94,7 +112,9 @@ class Film(Base):
         return {
             'id': self.id,
             'title': self.title,
+            'description': self.description,
             'duration': self.duration,
+            'poster_url': self.poster_url,
         }
 
 class Seance(Base):
@@ -109,6 +129,8 @@ class Seance(Base):
     film: Mapped['Film'] = relationship('Film', lazy='joined', back_populates='seances')
     hall: Mapped['Hall'] = relationship('Hall', lazy='joined', back_populates='seances')
     tickets: Mapped[list['Ticket']] = relationship('Ticket', lazy='joined', back_populates='seance')
+    available_seats: Mapped[list['AvailableSeat']] = relationship('AvailableSeat', lazy='joined', back_populates='seance')
+    bookings: Mapped[list['Booking']] = relationship('Booking', lazy='joined', back_populates='seance')
 
     @property
     def dict(self):
@@ -125,13 +147,13 @@ class Seance(Base):
 class Ticket(Base):
     __tablename__ = 'tickets'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    seance_id: Mapped[int] = mapped_column(Integer, ForeignKey('seances.id'), nullable=False)
-    seat_id: Mapped[int] = mapped_column(Integer, ForeignKey('seats.id'), nullable=False)
+    seance_id: Mapped[int] = mapped_column(Integer, ForeignKey('seances.id'), nullable=False, index=True)
+    seat_id: Mapped[int] = mapped_column(Integer, ForeignKey('seats.id'), nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
     user_name: Mapped[str] = mapped_column(String(100))
     user_phone: Mapped[str] = mapped_column(String(20))
     user_email: Mapped[str] = mapped_column(String(100))
-    booked: Mapped[bool] = mapped_column(Boolean, default=False)
+    booked: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     booking_code: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     qr_code_data: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -161,15 +183,19 @@ class Ticket(Base):
 class Price(Base):
     __tablename__ = 'prices'
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    seat_type: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
+    seance_id: Mapped[int] = mapped_column(Integer, ForeignKey('seances.id'), nullable=False)
+    seat_id: Mapped[int] = mapped_column(Integer, ForeignKey('seats.id'), nullable=False)
+    seat_type: Mapped[str] = mapped_column(String(20), nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=False)
 
-    tickets: Mapped[list['Ticket']] = relationship('Ticket', lazy='joined', back_populates='price')
+    # tickets: Mapped[list['Ticket']] = relationship('Ticket', lazy='joined', back_populates='price')
 
     @property
     def dict(self):
         return {
             'id': self.id,
+            'seance_id': self.seance_id,
+            'seat_id': self.seat_id,
             'seat_type': self.seat_type,
             'price': self.price,
         }
@@ -187,8 +213,9 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     tickets: Mapped[list['Ticket']] = relationship('Ticket', lazy='joined', back_populates='user')
+    bookings: Mapped[list['Booking']] = relationship('Booking', lazy='joined', back_populates='user')
 
-    
+   
     @property
     def dict(self):
         return {
@@ -198,6 +225,36 @@ class User(Base):
             'email': self.email,
             'role': self.role,    
         }
+
+class AvailableSeat(Base):
+    __tablename__ = 'available_seats'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    seat_id: Mapped[int] = mapped_column(Integer, ForeignKey('seats.id'), nullable=False, index=True)
+    seance_id: Mapped[int] = mapped_column(Integer, ForeignKey('seances.id'), nullable=False, index=True)
+
+    seat: Mapped['Seat'] = relationship('Seat', back_populates='available_seats')
+    seance: Mapped['Seance'] = relationship('Seance', back_populates='available_seats')
+
+    @property
+    def dict(self):
+        return {
+        'id': self.id,
+        'seat_id': self.seat_id,
+        'seance_id': self.seance_id,
+        'seat_details': self.seat.dict, 
+        }
+
+
+class Booking(Base):
+    __tablename__ = 'bookings'
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey('users.id'), nullable=False)
+    seance_id: Mapped[int] = mapped_column(Integer, ForeignKey('seances.id'), nullable=False)
+    seat_id: Mapped[int] = mapped_column(Integer, ForeignKey('seats.id'), nullable=False)
+
+    user: Mapped['User'] = relationship('User', lazy='joined', back_populates='bookings')
+    seance: Mapped['Seance'] = relationship('Seance', lazy='joined', back_populates='bookings')
+    seat: Mapped['Seat'] = relationship('Seat', lazy='joined', back_populates='bookings')
 
 
 ORM_OBJ = Hall | Seat | Film | Seance | Ticket | User | Price

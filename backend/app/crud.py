@@ -10,7 +10,8 @@ async def add_item(session: AsyncSession, item: ORM_OBJ):
         await session.commit()
         await session.refresh(item)
     except IntegrityError as err:
-        raise HTTPException(409, 'Item already exists')
+        print(f"IntegrityError: {err}")
+        raise HTTPException(409, f'Item already exists: {str(err)}')
 
 async def update_item(session: AsyncSession, item: ORM_OBJ):
     try:

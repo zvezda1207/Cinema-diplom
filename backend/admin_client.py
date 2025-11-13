@@ -2,11 +2,16 @@
 """
 Клиент для тестирования административных функций
 """
+import os
 import requests
 import json
 from datetime import datetime, timedelta
 
-BASE_URL = "http://localhost:8000"
+# Определяем BASE_URL: внутри Docker используем имя сервиса, снаружи - localhost
+BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+# Если запускаемся внутри Docker контейнера, используем внутренний адрес
+if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+    BASE_URL = 'http://backend:80'  # Внутренний адрес backend контейнера
 
 class AdminClient:
     def __init__(self):

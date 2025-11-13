@@ -9,14 +9,15 @@ class SuccessResponse(BaseModel):
 
 # Залы
 class CreateHallRequest(BaseModel):
-    name: str = Field(min_length=3, max_length=100)
+    name: str = Field(min_length=1, max_length=100)
     rows: int = Field(gt=0)
     seats_per_row: int = Field(gt=0)
 
 class UpdateHallRequest(BaseModel):
-    name: str = Field(min_length=3, max_length=100)
-    rows: int = Field(gt=0)
-    seats_per_row: int = Field(gt=0)
+    name: str | None = Field(None, min_length=1, max_length=100)
+    rows: int | None = Field(None, gt=0)
+    seats_per_row: int | None = Field(None, gt=0)
+    is_active: bool | None = None
 
 class CreateHallResponse(BaseModel):
     id: int
@@ -48,6 +49,7 @@ class CreateUserRequest(BaseModel):
     phone: str
     email: str
     password: str
+    role: str = 'user'  # По умолчанию 'user', можно указать 'admin'
 
 class CreateUserResponse(BaseModel):
     id: int
@@ -232,15 +234,33 @@ class CreateTicketRequest(BaseModel):
     user_email: str
     price: float
 
+class TicketSeatInfo(BaseModel):
+    id: int
+    hall_id: int
+    row_number: int
+    seat_number: int
+    seat_type: str | None = None
+
+
+class TicketSeanceInfo(BaseModel):
+    id: int
+    hall_id: int
+    film_id: int
+    start_time: datetime | None = None
+    price_standard: float | None = None
+    price_vip: float | None = None
+
+
 class CreateTicketResponse(BaseModel):
     id: int
     booking_code: str | None = None
     ticket_id: int | None = None
-    seat_info: dict | None = None
-    seance_info: dict | None = None
+    seat_info: TicketSeatInfo | None = None
+    seance_info: TicketSeanceInfo | None = None
     price: float | None = None
     qr_code_path: str | None = None
     message: str | None = None
+    archived: bool | None = None
 
 class UpdateTicketRequest(BaseModel):
     seance_id: int | None = None
@@ -266,12 +286,25 @@ class GetTicketResponse(BaseModel):
     booked: bool
     booking_code: str
     qr_code_data: str
+    created_at: datetime | None = None
+    seat_info: TicketSeatInfo | None = None
+    seance_info: TicketSeanceInfo | None = None
+    archived: bool
 
 class GetTicketsResponse(BaseModel):
     tickets: list[GetTicketResponse]
 
 class DeleteTicketResponse(SuccessResponse):
     pass
+
+
+class ArchiveTicketRequest(BaseModel):
+    archived: bool
+
+
+class ArchiveTicketResponse(BaseModel):
+    id: int
+    archived: bool
 
 class DeleteUserResponse(SuccessResponse):
     pass

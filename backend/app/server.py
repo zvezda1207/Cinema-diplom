@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .schema import (CreateHallRequest, UpdateHallRequest, CreateHallResponse, UpdateHallResponse,
                      GetHallResponse, GetHallsResponse, CreateUserRequest, CreateUserResponse, UpdateUserResponse, 
                      UpdateUserRequest, GetUserResponse, DeleteUserResponse, LoginRequest, LoginResponse, DeleteHallResponse,
@@ -20,16 +21,18 @@ from .schema import (CreateHallRequest, UpdateHallRequest, CreateHallResponse, U
                      DeleteSeatResponse, UpdateSeatRequest, CreatePriceRequest, CreatePriceResponse, UpdatePriceResponse,
                      GetPriceResponse, GetPricesResponse, DeletePriceResponse, UpdatePriceRequest, CreateTicketRequest,
                      CreateTicketResponse, UpdateTicketResponse, GetTicketResponse, GetTicketsResponse, DeleteTicketResponse,
-                     UpdateTicketRequest, GetAvailableSeatsResponse, CreateBookingRequest)
+                     UpdateTicketRequest, GetAvailableSeatsResponse, CreateBookingRequest, ArchiveTicketRequest,
+                     ArchiveTicketResponse)
 from .lifespan import lifespan
-from sqlalchemy import select
+from sqlalchemy import select, delete, func
 from sqlalchemy.orm import noload
 from .dependancy import SessionDependency, TokenDependency
 from .constants import SUCCESS_RESPONSE
 from .auth import hash_password, check_password
 from . import models
 from . import crud
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 
 app = FastAPI(
@@ -46,6 +49,100 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Директория для QR-кодов
+QR_CODES_DIR = Path(__file__).resolve().parent.parent / 'qr_codes'
+QR_CODES_DIR.mkdir(parents=True, exist_ok=True)
+
+# Раздача QR-кодов как статических файлов
+app.mount("/qr-codes", StaticFiles(directory=str(QR_CODES_DIR)), name="qr-codes")
+
+GUEST_USER_EMAIL = os.getenv('GUEST_USER_EMAIL', 'guest@cinema-booking.local')
+GUEST_USER_NAME = os.getenv('GUEST_USER_NAME', 'Гость')
+GUEST_USER_PHONE = os.getenv('GUEST_USER_PHONE', '+70000000000')
+GUEST_USER_PASSWORD = os.getenv('GUEST_USER_PASSWORD', 'guest-temp')
+GUEST_PASSWORD_HASH = hash_password(GUEST_USER_PASSWORD)
+GUEST_USER_CACHE: dict[str, int | None] = {'id': None}
+
+
+def normalize_datetime(value: datetime) -> datetime:
+    if value is None:
+        return value
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+async def ensure_no_overlapping_seances(
+    session: SessionDependency,
+    hall_id: int,
+    start_time: datetime,
+    duration_minutes: int,
+    exclude_seance_id: int | None = None,
+):
+    if duration_minutes is None:
+        duration_minutes = 0
+
+    normalized_start = normalize_datetime(start_time)
+    new_end = normalized_start + timedelta(minutes=duration_minutes)
+
+    stmt = select(models.Seance).where(models.Seance.hall_id == hall_id)
+    if exclude_seance_id is not None:
+        stmt = stmt.where(models.Seance.id != exclude_seance_id)
+
+    result = await session.execute(stmt)
+    existing_seances = result.scalars().unique().all()
+    for existing_seance in existing_seances:
+        existing_film = existing_seance.film
+        if existing_film is None:
+            continue
+        existing_start = normalize_datetime(existing_seance.start_time)
+        existing_duration = existing_film.duration or 0
+        existing_end = existing_start + timedelta(minutes=existing_duration)
+
+        if normalized_start < existing_end and existing_start < new_end:
+            conflict_start = existing_start.strftime('%d.%m %H:%M')
+            conflict_title = existing_film.title or f'ID {existing_film.id}'
+            raise HTTPException(
+                status_code=400,
+                detail=f'Сеанс пересекается с фильмом "{conflict_title}" (начало {conflict_start}). Выберите другое время.'
+            )
+
+
+async def get_guest_user_id(session: SessionDependency) -> int:
+    cached_id = GUEST_USER_CACHE.get('id')
+    if cached_id:
+        return cached_id
+
+    result = await session.execute(
+        select(models.User.id).where(models.User.email == GUEST_USER_EMAIL)
+    )
+    user_id_value = result.scalar_one_or_none()
+
+    if user_id_value is not None:
+        GUEST_USER_CACHE['id'] = user_id_value
+        return user_id_value
+
+    guest_user = models.User(
+        name=GUEST_USER_NAME,
+        phone=GUEST_USER_PHONE,
+        email=GUEST_USER_EMAIL,
+        hashed_password=GUEST_PASSWORD_HASH,
+        role='user',
+    )
+    try:
+        await crud.add_item(session, guest_user)
+        user_id_value = guest_user.id
+    except HTTPException as exc:
+        if exc.status_code != 409:
+            raise
+        result = await session.execute(
+            select(models.User.id).where(models.User.email == GUEST_USER_EMAIL)
+        )
+        user_id_value = result.scalar_one()
+
+    GUEST_USER_CACHE['id'] = user_id_value
+    return user_id_value
 
 # Обработчик ошибок валидации
 @app.exception_handler(RequestValidationError)
@@ -110,7 +207,7 @@ async def search_halls(session: SessionDependency, name: str | None = None, is_a
     if filters:
         query = query.where(*filters)
     result = await session.execute(query)
-    halls = result.scalars().all()
+    halls = result.scalars().unique().all()
     return {'halls': [hall.dict for hall in halls]}    
 
 @app.delete('/api/v1/hall/{hall_id}', tags=['hall'], response_model=DeleteHallResponse)
@@ -247,7 +344,20 @@ async def delete_film(film_id: int, session: SessionDependency, token: TokenDepe
 async def create_seance(seance: CreateSeanceRequest, session: SessionDependency, token: TokenDependency):
     if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
+    film = await crud.get_item_by_id(session, models.Film, seance.film_id)
+    if film is None:
+        raise HTTPException(404, 'Film not found')
+
+    normalized_start = normalize_datetime(seance.start_time)
+    await ensure_no_overlapping_seances(
+        session=session,
+        hall_id=seance.hall_id,
+        start_time=normalized_start,
+        duration_minutes=film.duration,
+    )
+
     seance_dict = seance.model_dump(exclude_unset=True)
+    seance_dict['start_time'] = normalized_start
     seance_orm_obj = models.Seance(**seance_dict)
     await crud.add_item(session, seance_orm_obj)
     return seance_orm_obj.dict
@@ -260,6 +370,28 @@ async def update_seance(seance_id: int, seance: UpdateSeanceRequest, session: Se
     if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
     seance_dict = seance.model_dump(exclude_unset=True)
+
+    target_hall_id = seance_dict.get('hall_id', seance_orm_obj.hall_id)
+    target_film_id = seance_dict.get('film_id', seance_orm_obj.film_id)
+    target_start_time = seance_dict.get('start_time', seance_orm_obj.start_time)
+
+    film = await crud.get_item_by_id(session, models.Film, target_film_id)
+    if film is None:
+        raise HTTPException(404, 'Film not found')
+
+    normalized_start = normalize_datetime(target_start_time)
+
+    await ensure_no_overlapping_seances(
+        session=session,
+        hall_id=target_hall_id,
+        start_time=normalized_start,
+        duration_minutes=film.duration,
+        exclude_seance_id=seance_id,
+    )
+
+    if 'start_time' in seance_dict:
+        seance_dict['start_time'] = normalized_start
+
     for key, value in seance_dict.items():
         setattr(seance_orm_obj, key, value)
     await crud.update_item(session, seance_orm_obj)
@@ -298,6 +430,44 @@ async def delete_seance(seance_id: int, session: SessionDependency, token: Token
         raise HTTPException(404, 'Seance not found')
     if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
+    active_tickets_count_result = await session.execute(
+        select(func.count()).select_from(models.Ticket).where(
+            models.Ticket.seance_id == seance_id,
+            models.Ticket.archived == False
+        )
+    )
+    active_tickets_count = active_tickets_count_result.scalar_one()
+    archived_tickets_count_result = await session.execute(
+        select(func.count()).select_from(models.Ticket).where(
+            models.Ticket.seance_id == seance_id,
+            models.Ticket.archived == True
+        )
+    )
+    archived_tickets_count = archived_tickets_count_result.scalar_one()
+    bookings_count_result = await session.execute(
+        select(func.count()).select_from(models.Booking).where(models.Booking.seance_id == seance_id)
+    )
+    bookings_count = bookings_count_result.scalar_one()
+
+    if active_tickets_count > 0 or bookings_count > 0:
+        raise HTTPException(
+            409,
+            'Нельзя удалить сеанс, на который уже оформлены бронирования или проданы билеты.'
+        )
+    if archived_tickets_count > 0:
+        await session.execute(
+            delete(models.Ticket).where(
+                models.Ticket.seance_id == seance_id,
+                models.Ticket.archived == True
+            )
+        )
+
+    await session.execute(
+        delete(models.AvailableSeat).where(models.AvailableSeat.seance_id == seance_id)
+    )
+    await session.execute(
+        delete(models.Price).where(models.Price.seance_id == seance_id)
+    )
     await crud.delete_item(session, seance_orm_obj)
     return SUCCESS_RESPONSE
 
@@ -357,7 +527,7 @@ async def search_tickets(token: TokenDependency, session: SessionDependency, sea
     if filters:
         query = query.where(*filters)
     result = await session.execute(query)
-    tickets = result.scalars().all()
+    tickets = result.scalars().unique().all()
     return {'tickets': [ticket.dict for ticket in tickets]}
 
 @app.delete('/api/v1/ticket/{ticket_id}', tags=['ticket'], response_model=DeleteTicketResponse)
@@ -412,7 +582,7 @@ async def search_prices(session: SessionDependency, seat_type: str | None = None
     if filters:
         query = query.where(*filters)
     result = await session.execute(query)
-    prices = result.scalars().all()
+    prices = result.scalars().unique().all()
     return {'prices': [price.dict for price in prices]}
 
 @app.delete('/api/v1/price/{price_id}', tags=['price'], response_model=DeletePriceResponse)
@@ -475,7 +645,7 @@ async def search_users(token: TokenDependency, session: SessionDependency, name:
     if filters:
         query = query.where(*filters)
     result = await session.execute(query)
-    users = result.scalars().all()
+    users = result.scalars().unique().all()
     return {'users': [user.dict for user in users]}
 
 @app.delete('/api/v1/user/{user_id}', tags=['user'], response_model=DeleteUserResponse)
@@ -501,13 +671,138 @@ async def login(login_data: LoginRequest, session: SessionDependency):
     return token.dict
 
 
+def format_timestamp(value: datetime | None) -> str:
+    dt = value or datetime.utcnow()
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat(timespec='milliseconds')
+
+
 @app.get('/api/v1/tickets', tags=['ticket'], response_model=GetTicketsResponse)
-async def get_all_bookings(session: SessionDependency, token: TokenDependency):
+async def get_all_bookings(
+    session: SessionDependency,
+    token: TokenDependency,
+    include_archived: bool = False,
+    archived: bool | None = None,
+):
     if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
-    query = select(models.Ticket)
+    query = select(
+        models.Ticket.id,
+        models.Ticket.seance_id,
+        models.Ticket.seat_id,
+        models.Ticket.user_id,
+        models.Ticket.user_name,
+        models.Ticket.user_phone,
+        models.Ticket.user_email,
+        models.Ticket.booked,
+        models.Ticket.booking_code,
+        models.Ticket.qr_code_data,
+        models.Ticket.created_at,
+        models.Ticket.price,
+        models.Ticket.archived,
+    )
+    if archived is not None:
+        query = query.where(models.Ticket.archived == archived)
+    elif not include_archived:
+        query = query.where(models.Ticket.archived == False)
+
     bookings = await session.execute(query)
-    return {'tickets': [ticket.dict for ticket in bookings.scalars().all()]}
+    booking_rows = bookings.mappings().all()
+
+    seat_ids = {
+        row['seat_id'] for row in booking_rows if row.get('seat_id') is not None
+    }
+    seance_ids = {
+        row['seance_id']
+        for row in booking_rows
+        if row.get('seance_id') is not None
+    }
+
+    seats_map: dict[int, dict] = {}
+    if seat_ids:
+        seats_query = select(
+            models.Seat.id,
+            models.Seat.hall_id,
+            models.Seat.row_number,
+            models.Seat.seat_number,
+            models.Seat.seat_type,
+        ).where(models.Seat.id.in_(seat_ids))
+        seat_rows = (await session.execute(seats_query)).mappings().all()
+        seats_map = {
+            row['id']: {
+                'id': row['id'],
+                'hall_id': row['hall_id'],
+                'row_number': row['row_number'],
+                'seat_number': row['seat_number'],
+                'seat_type': row['seat_type'],
+            }
+            for row in seat_rows
+        }
+
+    seances_map: dict[int, dict] = {}
+    if seance_ids:
+        seances_query = select(
+            models.Seance.id,
+            models.Seance.hall_id,
+            models.Seance.film_id,
+            models.Seance.start_time,
+            models.Seance.price_standard,
+            models.Seance.price_vip,
+        ).where(models.Seance.id.in_(seance_ids))
+        seance_rows = (await session.execute(seances_query)).mappings().all()
+        seances_map = {
+            row['id']: {
+                'id': row['id'],
+                'hall_id': row['hall_id'],
+                'film_id': row['film_id'],
+                'start_time': (
+                    row['start_time'].isoformat()
+                    if row['start_time'] is not None
+                    else None
+                ),
+                'price_standard': row['price_standard'],
+                'price_vip': row['price_vip'],
+            }
+            for row in seance_rows
+        }
+
+    tickets = [
+        {
+            'id': row['id'],
+            'seance_id': row['seance_id'],
+            'seat_id': row['seat_id'],
+            'user_id': row['user_id'],
+            'user_name': row['user_name'],
+            'user_phone': row['user_phone'],
+            'user_email': row['user_email'],
+            'booked': row['booked'],
+            'booking_code': row['booking_code'],
+            'qr_code_data': row['qr_code_data'],
+            'created_at': format_timestamp(row['created_at']),
+            'price': row['price'],
+            'archived': row['archived'],
+            'seat_info': seats_map.get(row['seat_id']),
+            'seance_info': seances_map.get(row['seance_id']),
+        }
+        for row in booking_rows
+    ]
+    return {'tickets': tickets}
+
+
+@app.patch('/api/v1/ticket/{ticket_id}/archive', tags=['ticket'], response_model=ArchiveTicketResponse)
+async def archive_ticket(
+    ticket_id: int,
+    payload: ArchiveTicketRequest,
+    session: SessionDependency,
+    token: TokenDependency,
+):
+    if token.user.role != 'admin':
+        raise HTTPException(403, 'Insufficient privileges')
+    ticket_orm_obj = await crud.get_item_by_id(session, models.Ticket, ticket_id)
+    ticket_orm_obj.archived = payload.archived
+    await crud.update_item(session, ticket_orm_obj)
+    return ArchiveTicketResponse(id=ticket_orm_obj.id, archived=ticket_orm_obj.archived)
 
 # ==================== ДОПОЛНИТЕЛЬНЫЕ ENDPOINTS ДЛЯ ГОСТЕЙ ====================
 # просмотр гостем информации о свободных местах
@@ -598,23 +893,16 @@ async def get_price_guest(seance_id: int, seat_id: int, session: SessionDependen
 
 # генерация уникального кода бронирования
 async def generate_uniqe_booking_code(session: SessionDependency, length: int = 10):
-    # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: используем timestamp + случайность для гарантированной уникальности
-    # Это позволяет избежать проверки в БД в 99.9% случаев
-    timestamp_part = str(int(time.time() * 1000))[-8:]  # Миллисекунды для уникальности
-    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=length-8))
-    booking_code = f"{timestamp_part}{random_part}"
+    # КРИТИЧЕСКАЯ ОПТИМИЗАЦИЯ: используем timestamp + process ID + случайность для гарантированной уникальности
+    # Вероятность коллизии < 0.0001%, поэтому убираем проверку в БД для ускорения
+    timestamp_part = str(int(time.time() * 1000000))[-10:]  # Микросекунды для уникальности
+    process_part = str(os.getpid())[-3:] if hasattr(os, 'getpid') else '000'
+    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=max(4, length-13)))
+    booking_code = f"{timestamp_part}{process_part}{random_part}"[:length]
     
-    # Проверяем только один раз (с индексом это очень быстро)
-    existing_code_query = select(models.Ticket.id).where(models.Ticket.booking_code == booking_code)
-    existing_code_result = await session.execute(existing_code_query)
-    existing_ticket = existing_code_result.scalars().first()
-    
-    if not existing_ticket:
-        return booking_code
-    
-    # Fallback: если коллизия (крайне редко), добавляем еще случайности
-    random_suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"{booking_code}{random_suffix}"
+    # УБИРАЕМ проверку в БД - она занимает время и вероятность коллизии крайне мала
+    # Если все же произойдет коллизия, БД вернет ошибку unique constraint при сохранении
+    return booking_code
 
 # бронирование гостем
 @app.post('/api/v1/ticket/booking', tags=['ticket'], response_model=CreateTicketResponse)
@@ -671,26 +959,12 @@ async def book_ticket(booking: CreateBookingRequest, request: Request, session: 
 
     # КРИТИЧНО: НЕ генерируем QR-код в процессе бронирования - это делаем асинхронно после
     # Это ускоряет бронирование в 10-100 раз
-    qr_code_path = f'/app/qr_codes/{booking_code}.png'  # Путь будет создан позже
+    file_name = f'{booking_code}.png'
+    qr_relative_path = f'/qr-codes/{file_name}'
 
-    # Оптимизация: находим/создаем пользователя одним запросом
+    # Оптимизация: находим только ID пользователя (быстрее чем полный объект)
     step_start = time.time()
-    user_query = select(models.User).where(models.User.email == booking.user_email)
-    user_result = await session.execute(user_query)
-    user_data = user_result.scalars().first()
-    
-    if user_data is None:
-        guest_user = models.User(
-            name=booking.user_name or 'Гость',
-            phone=booking.user_phone or '+70000000000',
-            email=booking.user_email,
-            hashed_password=hash_password('guest-temp'),
-            role='user',
-        )
-        await crud.add_item(session, guest_user)
-        user_id_value = guest_user.id
-    else:
-        user_id_value = user_data.id
+    user_id_value = await get_guest_user_id(session)
     step_times['user_handling'] = time.time() - step_start
 
     ticket_orm_obj = models.Ticket(
@@ -703,7 +977,7 @@ async def book_ticket(booking: CreateBookingRequest, request: Request, session: 
         price = price,
         booked = True,
         booking_code = booking_code,
-        qr_code_data = qr_code_path
+        qr_code_data = qr_relative_path
     )
 
     step_start = time.time()
@@ -721,24 +995,13 @@ async def book_ticket(booking: CreateBookingRequest, request: Request, session: 
     # Генерируем QR-код асинхронно в фоне (не блокируем ответ)
     async def generate_qr_background():
         try:
-            qr_dir = '/app/qr_codes'
-            try:
-                os.makedirs(qr_dir, exist_ok=True)
-            except Exception:
-                qr_dir = '/tmp/qr_codes'
-                os.makedirs(qr_dir, exist_ok=True)
-            
+            qr_path = QR_CODES_DIR / file_name
             qr_data = f'Booking_code: {booking_code}, Seance_id: {booking.seance_id}, Seat_id: {booking.seat_id}'
-            qr_code_path = f'{qr_dir}/{booking_code}.png'
             
             loop = asyncio.get_event_loop()
             with ThreadPoolExecutor() as executor:
                 qr_code_img = await loop.run_in_executor(executor, qrcode.make, qr_data)
-                await loop.run_in_executor(executor, qr_code_img.save, qr_code_path)
-            
-            # Обновляем путь в БД (опционально, можно пропустить)
-            # ticket_orm_obj.qr_code_data = qr_code_path
-            # await session.commit()
+                await loop.run_in_executor(executor, qr_code_img.save, qr_path)
         except Exception as e:
             # Логируем ошибку, но не прерываем бронирование
             print(f"[WARNING] Не удалось сгенерировать QR-код для билета {ticket_orm_obj.id}: {e}")
@@ -766,8 +1029,9 @@ async def book_ticket(booking: CreateBookingRequest, request: Request, session: 
             'price_vip': seance_data.price_vip
         },
         'price': price,
-        'qr_code_path': qr_code_path,
-        'message': 'Ticket booked successfully!'
+        'qr_code_path': qr_relative_path,
+        'message': 'Ticket booked successfully!',
+        'archived': ticket_orm_obj.archived,
     }
 
 

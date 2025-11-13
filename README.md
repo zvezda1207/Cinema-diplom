@@ -1,186 +1,210 @@
-# Cinema Booking System - Система бронирования билетов в кинотеатр
+# Cinema Booking System — система онлайн-бронирования билетов
 
-Дипломный проект по профессии «Веб-разработчик: Backend-разработка на Python»
+Дипломный проект по профессии «Веб‑разработчик: Backend-разработка на Python». Приложение включает клиентскую часть для пользователей и административную панель для управления репертуаром и продажами.
 
-## Описание проекта
+## Содержание
 
-Комплексное веб-приложение для онлайн бронирования билетов в кинотеатр с административной панелью для управления залами, сеансами и бронированиями.
+- [Cinema Booking System — система онлайн-бронирования билетов](#cinema-booking-system--система-онлайн-бронирования-билетов)
+  - [Содержание](#содержание)
+  - [Общая информация](#общая-информация)
+  - [Структура репозитория](#структура-репозитория)
+  - [Переменные окружения](#переменные-окружения)
+  - [Развёртывание через Docker Compose](#развёртывание-через-docker-compose)
+    - [Предварительные требования](#предварительные-требования)
+    - [Шаги](#шаги)
+    - [Остановка](#остановка)
+  - [Локальная разработка](#локальная-разработка)
+    - [Backend без Docker](#backend-без-docker)
+    - [Frontend без Docker](#frontend-без-docker)
+  - [Миграции БД](#миграции-бд)
+  - [Основные функции](#основные-функции)
+  - [Создание зала и генерация мест](#создание-зала-и-генерация-мест)
+  - [Полезные ссылки](#полезные-ссылки)
+  - [Лицензия и авторство](#лицензия-и-авторство)
 
-### Технологический стек
+## Общая информация
 
-**Backend:**
-- Python 3.11
-- FastAPI
-- SQLAlchemy (ORM)
-- PostgreSQL
-- Alembic (миграции)
-- Uvicorn (ASGI сервер)
+- **Backend:** Python 3.11, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL.  
+- **Frontend:** React 18 (Vite), React Router, Axios.  
+- **Инфраструктура:** Docker, Docker Compose.  
+- **Основные сценарии:** покупка билета гостем, просмотр/архивирование бронирований, управление залами и сеансами.
 
-**Frontend:**
-- React 18
-- React Router
-- Axios
-- CSS3
-
-**DevOps:**
-- Docker
-- Docker Compose
-
-## Структура проекта
+## Структура репозитория
 
 ```
 cinema-booking/
-├── backend/              # Backend приложение (FastAPI)
+├── backend/                     # Серверное приложение (FastAPI)
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── server.py    # Основной файл приложения
-│   │   └── database.py  # Настройка подключения к БД
-│   ├── models.py        # Модели SQLAlchemy
-│   ├── requirements.txt # Python зависимости
+│   │   ├── auth.py              # Аутентификация/хэширование паролей
+│   │   ├── config.py            # Конфигурация и сборка DSN
+│   │   ├── constants.py
+│   │   ├── crud.py              # Универсальные операции с ORM
+│   │   ├── dependancy.py        # Зависимости FastAPI (сессия, токен)
+│   │   ├── lifespan.py          # Жизненный цикл приложения
+│   │   ├── models.py            # SQLAlchemy-модели
+│   │   ├── schema.py            # Pydantic-схемы запросов/ответов
+│   │   └── server.py            # Основные endpoints API
+│   ├── alembic/                 # Миграции БД
+│   │   ├── env.py               # Конфигурация Alembic
+│   │   └── versions/            # Скрипты миграций
+│   ├── requirements.txt         # Python-зависимости бэкенда
 │   └── Dockerfile
-├── frontend/            # Frontend приложение (React)
-│   ├── public/
+├── frontend/                    # Клиентское приложение (React)
+│   ├── public/                  # Статические ресурсы
 │   ├── src/
-│   ├── package.json
+│   │   ├── pages/               # Страницы (Hall, Payment, Ticket, Admin и т.д.)
+│   │   ├── components/          # Переиспользуемые компоненты
+│   │   └── services/api.js      # Работа с API
+│   ├── package.json             # JS-зависимости
 │   └── Dockerfile
-├── docker-compose.yml   # Оркестрация сервисов
+├── docker-compose.yml           # Описание сервисов для развёртывания
+├── .env.example                 # Шаблон переменных окружения
 └── README.md
 ```
 
-## Модели данных
+## Переменные окружения
 
-- **Token** - токены
-- **Hall** - кинозалы
-- **Seat** - места в залах
-- **Film** - фильмы
-- **Seance** - сеансы
-- **Ticket** - билеты
-- **Price** - цены
-- **User** - администраторы
-- **AvailableSeat** - свободные места
-- **Booking** - бронирования
+Создайте файл `.env` в корне проекта (можно на основе `.env.example`) и укажите значения:
 
+```
+POSTGRES_DB=cinema_example
+POSTGRES_USER=cinema_user
+POSTGRES_PASSWORD=cinema_password
+```
 
-## Установка и запуск
+Дополнительно можно переопределить значения по умолчанию для гостевого пользователя (используется при бронировании без регистрации):
+
+```
+GUEST_USER_EMAIL=no-reply@example.com
+GUEST_USER_NAME=Гость
+GUEST_USER_PHONE=+79991234567
+GUEST_USER_PASSWORD=guest-temp
+```
+
+При запуске через Docker Compose эти переменные пробрасываются в контейнеры автоматически. Если запускаете backend локально, их нужно экспортировать в окружение вашей оболочки перед стартом сервера.
+
+## Развёртывание через Docker Compose
 
 ### Предварительные требования
 
-- Docker 20.10+
+- Docker 20.10+  
 - Docker Compose 2.0+
 
-### Шаг 1: Клонирование репозитория
+### Шаги
 
 ```bash
 git clone <repository-url>
 cd cinema-booking
+cp .env.example .env    # либо скопировать вручную и заполнить значениями
+
+# Сборка и запуск (foreground)
+docker compose up --build
+
+# или запуск в фоне
+docker compose up -d --build
 ```
 
-### Шаг 2: Создание .env файла
+Сервисы будут доступны по адресам:
 
-Создайте файл `.env` в корне проекта на основе `.env.example`:
+- Backend API: `http://localhost:8000`  
+- Swagger UI: `http://localhost:8000/docs`  
+- Frontend: `http://localhost:3000`  
+- PostgreSQL: `localhost:15432` (в контейнере — `db:5432`)
+
+### Остановка
 
 ```bash
-# На Linux/Mac
-cp .env.example .env
-
-# На Windows PowerShell
-Copy-Item .env.example .env
+docker compose down          # остановка контейнеров
+docker compose down -v       # остановка + очистка volumes (удалит БД)
 ```
 
-Содержимое `.env`:
-```env
-POSTGRES_DB=cinema_booking
-POSTGRES_USER=cinema_user
-POSTGRES_PASSWORD=cinema_password_2024
-```
+## Локальная разработка
 
-### Шаг 3: Запуск приложения
-
-```bash
-# Сборка и запуск всех контейнеров
-docker-compose up --build
-
-# Или в фоновом режиме
-docker-compose up -d --build
-```
-
-### Шаг 4: Проверка работы
-
-- **Backend API:** http://localhost:8000
-- **API Docs (Swagger):** http://localhost:8000/docs
-- **Frontend:** http://localhost:3000
-- **PostgreSQL:** localhost:5434
-
-### Остановка приложения
-
-```bash
-# Остановка контейнеров
-docker-compose down
-
-# Остановка с удалением volumes (БД будет очищена!)
-docker-compose down -v
-```
-
-## Разработка
-
-### Backend
+### Backend без Docker
 
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+# Экспортируйте переменные окружения (пример для PowerShell)
+$env:POSTGRES_DB = 'cinema_example'
+$env:POSTGRES_USER = 'cinema_user'
+$env:POSTGRES_PASSWORD = 'cinema_password'
+$env:POSTGRES_HOST = 'localhost'
+$env:POSTGRES_PORT = '15432'
+
 uvicorn app.server:app --reload
 ```
 
-### Frontend
+### Frontend без Docker
 
 ```bash
 cd frontend
 npm install
-npm start
+npm run dev     # Vite dev server (порт 3000)
 ```
 
-## API Endpoints
+API-адрес берётся из переменной `VITE_API_URL` (по умолчанию — `http://localhost:8000`). Изменить можно в `.env` фронтенда или перед запуском:
 
-### Публичные
-- `GET /api/movies` - Список фильмов
-- `GET /api/sessions` - Список сеансов
-- `POST /api/bookings` - Создание бронирования
-- `GET /api/halls/{id}/seats` - Места в зале
+```bash
+VITE_API_URL=http://localhost:8000 npm run dev
+```
 
-### Административные (требуют авторизации)
-- `POST /api/admin/halls` - Создание зала
-- `PUT /api/admin/halls/{id}` - Редактирование зала
-- `POST /api/admin/sessions` - Создание сеанса
-- `GET /api/admin/bookings` - Список бронирований
+## Миграции БД
 
-## Функциональность
+Для работы с Alembic активируйте виртуальное окружение бэкенда и убедитесь, что переменные среды указывают на нужную БД. Например, для локальной БД из Docker Compose:
 
-### Пользовательская часть
-- Просмотр списка фильмов и сеансов
-- Выбор места в зале
-- Бронирование билета
-- Получение кода бронирования
+```bash
+cd backend
+source .venv/bin/activate                   # или .venv\Scripts\activate
 
-### Административная часть
-- Управление залами (создание, редактирование, активация/деактивация)
-- Настройка мест в залах
-- Управление фильмами
-- Создание сеансов
-- Просмотр бронирований
-- Управление продажами билетов
+# Пример настройки окружения (PowerShell)
+$env:POSTGRES_HOST = 'localhost'
+$env:POSTGRES_PORT = '15432'
+$env:POSTGRES_DB = 'cinema_example'
+$env:POSTGRES_USER = 'cinema_user'
+$env:POSTGRES_PASSWORD = 'cinema_password'
 
-## Лицензия
+alembic upgrade head        # применить все миграции
+alembic revision -m "..."   # создать новую миграцию (при изменении моделей)
+```
 
-Проект создан в образовательных целях в рамках дипломного проекта Нетология.
+Миграции расположены в `backend/alembic/versions/`. Актуальная схема включает поле `archived` в таблице `tickets` и дополнительные служебные миграции (`4f419bf2c3ec`, `b6c6f1d04ca9`).
 
-## Автор
+## Основные функции
 
-[Ткачева Ирина]
+- Покупка билетов гостем с генерацией QR-кода и подсветкой конфликтов мест.  
+- Страница оплаты с подтверждением, задержкой перехода и сообщениями об успехе.  
+- Электронный билет с повторными попытками загрузки QR и подсказками.  
+- Адаптивная схема зала и страниц оплаты/билета под ключевые разрешения (375 px, 768 px и т.д.).  
+- Админ-панель: управление залами, фильмами, сеансами, просмотр бронирований.  
+- Архивирование бронирований и автоматическая очистка архивных билетов при удалении сеанса.  
+- Оптимизированный backend: кэш гостевого пользователя, асинхронная генерация QR, проверки конфликтов сеансов.
 
-## Ссылки
+Полный перечень endpoints доступен в Swagger UI (`/docs`). Основной префикс API — `/api/v1/`.
 
-- [Задание дипломного проекта](https://github.com/netology-code/fsmidpd-diplom)
+## Создание зала и генерация мест
 
+Администратор может создать новый зал через веб-интерфейс (раздел «Залы») или вызовом `POST /api/v1/hall`. Для быстрого поднятия окружения используйте комплект скриптов:
 
+1. `python backend/create_admin.py` — создаёт администратора (`admin@example.com` / `admin123`) непосредственно в базе.  
+2. `python backend/create_test_data.py` — авторизуется как администратор, добавляет тестовые фильмы, залы и сеансы.  
+3. `python backend/generate_seats.py <hall_id>` — проходит по параметрам зала и генерирует все места, помечая центральные ряды как VIP.  
+4. `python backend/update_vip_seats.py <hall_id> 4-7` — необязательный шаг для переназначения VIP-рядов (можно указать диапазон или список номеров).
+
+Скрипты обращаются к тому же API, что и фронтенд, поэтому перед запуском убедитесь, что backend поднят и переменные окружения настроены.
+
+## Полезные ссылки
+
+- [FastAPI documentation](https://fastapi.tiangolo.com/)  
+- [SQLAlchemy 2.0 docs](https://docs.sqlalchemy.org/en/20/)  
+- [Alembic migrations](https://alembic.sqlalchemy.org/en/latest/)  
+- [React 18 docs](https://react.dev/)  
+- [Docker documentation](https://docs.docker.com/)
+
+## Лицензия и авторство
+
+Проект выполнен в учебных целях в рамках дипломной работы Нетологии.  
+Автор: **Ткачева Ирина**

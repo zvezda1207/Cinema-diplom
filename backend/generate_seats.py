@@ -4,10 +4,15 @@
 """
 
 import sys
+import os
 import requests
 from admin_client import AdminClient
 
-BASE_URL = "http://localhost:8000"
+# Определяем BASE_URL: внутри Docker используем имя сервиса, снаружи - localhost
+BASE_URL = os.getenv('API_BASE_URL', 'http://localhost:8000')
+# Если запускаемся внутри Docker контейнера, используем внутренний адрес
+if os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER'):
+    BASE_URL = 'http://backend:80'  # Внутренний адрес backend контейнера
 
 
 def generate_seats_for_hall(hall_id: int, vip_rows: list[int] = None):

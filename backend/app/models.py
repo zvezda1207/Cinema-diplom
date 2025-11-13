@@ -158,6 +158,7 @@ class Ticket(Base):
     qr_code_data: Mapped[str] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     price: Mapped[float] = mapped_column(Float, nullable=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
         
     user: Mapped['User'] = relationship('User', lazy='joined', back_populates='tickets')
     seance: Mapped['Seance'] = relationship('Seance', lazy='joined', back_populates='tickets')
@@ -178,6 +179,7 @@ class Ticket(Base):
             'qr_code_data': self.qr_code_data,
             'created_at': self.created_at.isoformat(),
             'price': self.price,
+            'archived': self.archived,
         }
 
 class Price(Base):

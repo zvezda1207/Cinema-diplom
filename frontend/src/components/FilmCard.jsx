@@ -2,17 +2,13 @@ import { Link } from 'react-router-dom'
 
 // eslint-disable-next-line no-unused-vars
 function FilmCard({ film, seances, selectedDate }) {
-    // ВРЕМЕННО: Фильтруем сеансы только по фильму, без фильтрации по дате
-    // Это нужно для тестирования, когда на выбранную дату нет сеансов
-    // TODO: Вернуть фильтрацию по дате после тестирования (использовать selectedDate)
+    // Фильтруем сеансы по фильму и дате
     const filmSeances = seances.filter(seance => {
         if (seance.film_id !== film.id) return false
-        // Временно убрана фильтрация по дате
-        // if (!selectedDate) return true
-        // const seanceDate = new Date(seance.start_time).toISOString().split('T')[0]
-        // const selectedDateStr = selectedDate.toISOString().split('T')[0]
-        // return seanceDate === selectedDateStr
-        return true
+        if (!selectedDate) return true
+        const seanceDate = new Date(seance.start_time).toISOString().split('T')[0]
+        const selectedDateStr = selectedDate.toISOString().split('T')[0]
+        return seanceDate === selectedDateStr
     })
 
     // Группируем сеансы по залам

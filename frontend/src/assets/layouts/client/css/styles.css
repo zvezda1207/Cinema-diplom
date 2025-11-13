@@ -202,6 +202,8 @@ body {
 .buying {
   background-color: rgba(241, 235, 230, 0.95);
   padding-bottom: 3rem;
+  width: min(92%, 720px);
+  margin: 0 auto 3rem;
 }
 
 .buying__info {
@@ -254,7 +256,7 @@ body {
 .buying-scheme {
   text-align: center;
   background-color: #171D24;
-  padding: 1.5rem 3rem 1.5rem;
+  padding: 1.5rem 2.4rem 1.5rem;
 }
 
 .buying-scheme__wrapper {
@@ -264,7 +266,7 @@ body {
   background-position: top;
   background-repeat: no-repeat;
   background-size: 100%;
-  padding-top: 3rem;
+  padding-top: 2.3rem;
 }
 
 .buying-scheme__wrapper::before {
@@ -278,15 +280,16 @@ body {
 .buying-scheme__chair {
   display: inline-block;
   vertical-align: middle;
-  width: 2rem;
-  height: 2rem;
+  width: 1.8rem;
+  height: 1.8rem;
   border: 1px solid #525252;
   box-sizing: border-box;
   border-radius: 4px;
+  font-size: 1.15rem;
 }
 
 .buying-scheme__chair:not(:first-of-type) {
-  margin-left: 4px;
+  margin-left: 3.5px;
 }
 
 .buying-scheme__chair_disabled {
@@ -312,26 +315,19 @@ body {
 }
 
 .buying-scheme__legend {
-  padding-top: 3rem;
-  font-size: 1.4rem;
+  padding-top: 2.4rem;
+  font-size: 1.3rem;
   font-weight: 300;
   color: #FFFFFF;
   display: flex;
   flex-wrap: nowrap;
+  justify-content: center;
   text-align: left;
+  gap: 2rem;
 }
 
 .buying-scheme__legend .col {
-  max-width: 25rem;
-}
-
-.buying-scheme__legend .col:first-of-type {
-  padding-right: 1.5rem;
-  margin-left: auto;
-}
-
-.buying-scheme__legend .col:last-of-type {
-  margin-right: auto;
+  margin: 0;
 }
 
 .buying-scheme__legend .buying-scheme__legend-price+.buying-scheme__legend-price {
@@ -466,5 +462,202 @@ body {
 
   .buying__info-hint {
     display: none;
+  }
+}
+
+@media (max-width: 990px) {
+  .buying__info .buying__info-start {
+    font-size: 1.2rem;
+  }
+
+  .buying {
+    padding-bottom: 2.4rem;
+    width: min(94%, 620px);
+  }
+
+  .buying-scheme {
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 2.4rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+
+  .buying-scheme__legend {
+    padding-top: 2.2rem;
+    flex-direction: column;
+    gap: 1.2rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .buying-scheme__legend .col {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .buying {
+    padding-bottom: 2rem;
+    width: min(96%, 520px);
+  }
+
+  .buying-scheme {
+    padding: 1rem 1.1rem 1.2rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 2.1rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.55rem;
+    height: 1.55rem;
+    font-size: 1.05rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 2.5px;
+  }
+}
+
+@media (max-width: 400px) {
+  .buying__info {
+    padding: 1.1rem 1.2rem 0.75rem;
+  }
+
+  .buying {
+    width: 100%;
+  }
+
+  .buying-scheme {
+    padding: 0.9rem 0.95rem 1.05rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 2.05rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 1.05rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 2.4px;
+  }
+}
+
+@media (max-width: 378px) {
+  .buying-scheme {
+    padding: 0.82rem 0.78rem 0.95rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 1.95rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: 0.98rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 1.9px;
+  }
+
+  .buying__info-title,
+  .buying__info-hall {
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 366px) {
+  .buying-scheme {
+    padding: 0.68rem 0.62rem 0.82rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 1.78rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.16rem;
+    height: 1.16rem;
+    font-size: 0.86rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 1.3px;
+  }
+
+  .buying__info-title,
+  .buying__info-hall {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 356px) {
+  .buying-scheme {
+    padding: 0.63rem 0.58rem 0.78rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 1.73rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.12rem;
+    height: 1.12rem;
+    font-size: 0.84rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 1.15px;
+  }
+
+  .buying__info-title,
+  .buying__info-hall {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 344px) {
+  .buying {
+    padding-bottom: 1.6rem;
+  }
+
+  .buying-scheme {
+    padding: 0.58rem 0.52rem 0.72rem;
+  }
+
+  .buying-scheme__wrapper {
+    padding-top: 1.68rem;
+  }
+
+  .buying-scheme__chair {
+    width: 1.05rem;
+    height: 1.05rem;
+    font-size: 0.8rem;
+  }
+
+  .buying-scheme__chair:not(:first-of-type) {
+    margin-left: 1px;
+  }
+
+  .buying__info-title,
+  .buying__info-hall {
+    font-size: 1.2rem;
+  }
+
+  .buying-scheme__legend {
+    gap: 1rem;
   }
 }

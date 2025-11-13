@@ -1,0 +1,357 @@
+/* Updated admin stylesheet aligned with new layout */
+.admin-loading {
+    text-align: center;
+    padding: 3rem;
+    font-size: 1.2rem;
+}
+
+.admin-loading-inline {
+    margin: 2rem auto;
+    text-align: center;
+    color: #666;
+}
+
+/* Логин */
+.login__error {
+    margin-top: 0.75rem;
+    color: #ff4d4f;
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.login__hint {
+    margin-top: 2rem;
+    padding: 1rem 1.5rem;
+    background-color: rgba(255, 255, 255, 0.75);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: #4a4a4a;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.login__hint strong {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.error {
+    color: #dc3545;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+/* Основная страница */
+.admin-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem 4rem;
+}
+
+.admin-feedback {
+    margin: 1.5rem auto;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    background: #fff8e5;
+    border: 1px solid #f7d382;
+    color: #8c6517;
+    max-width: 720px;
+}
+
+.logout-btn {
+    padding: 0.5rem 1rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.logout-btn:hover {
+    background: #c82333;
+}
+
+.admin-table {
+    overflow-x: auto;
+    margin-top: 2rem;
+}
+
+.admin-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.admin-table th {
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.admin-table tr:nth-child(odd) td {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+/* Дополнительные элементы */
+.conf-step__form {
+    margin-top: 1.5rem;
+    text-align: left;
+}
+
+.conf-step__textarea {
+    width: 100%;
+    min-height: 90px;
+    resize: vertical;
+    padding: 0.75rem;
+    border-radius: 4px;
+    border: 1px solid #dcdcdc;
+    font-family: inherit;
+}
+
+.conf-step__seances-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.conf-step__bookings {
+    margin-top: 2rem;
+    text-align: left;
+}
+
+.conf-step__bookings-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    gap: 1rem;
+}
+
+.conf-step__bookings-tools {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.conf-step__bookings-filters {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.conf-step__bookings-filters button {
+    flex-shrink: 0;
+}
+
+.conf-step__bookings-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.conf-step__bookings-actions button {
+    flex-shrink: 0;
+}
+
+.conf-step__button-regular--active {
+    background: rgba(0, 0, 0, 0.08);
+    border-color: rgba(0, 0, 0, 0.2);
+    color: #1f1f1f;
+}
+
+.conf-step__bookings-controls span {
+    font-weight: 600;
+}
+
+.conf-step__bookings-controls button {
+    flex-shrink: 0;
+}
+
+.conf-step__bookings-title {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.conf-step__bookings-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.5rem;
+}
+
+.conf-step__bookings-item {
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.conf-step__bookings-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    flex: 1;
+}
+
+.conf-step__bookings-item-headline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.conf-step__bookings-item-details {
+    color: #555;
+    font-size: 0.92rem;
+    line-height: 1.35;
+}
+
+.conf-step__booking-tag {
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.conf-step__bookings-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.conf-step__bookings-item_archived {
+    background: rgba(240, 240, 240, 0.85);
+}
+
+.conf-step__alert {
+    margin: 1.5rem auto 0;
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 500;
+    max-width: 600px;
+}
+
+.conf-step__alert_success {
+    background: #e8f8ef;
+    border: 1px solid #aacfb6;
+    color: #1d6a3c;
+}
+
+.conf-step__alert_error {
+    background: #fdeaea;
+    border: 1px solid #f1b5b5;
+    color: #9a2e2e;
+}
+
+.conf-step__actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.conf-step__list .conf-step__button-trash {
+    margin-left: 0.75rem;
+}
+
+.conf-step__hall-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.conf-step__hall-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.conf-step__hall-title {
+    font-weight: 600;
+}
+
+.conf-step__hall-id {
+    font-size: 0.75rem;
+    color: #666;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.conf-step__form-error {
+    margin: 1rem auto 0;
+    padding: 0.75rem 1rem;
+    max-width: 420px;
+    background: rgba(192, 57, 43, 0.1);
+    border: 1px solid rgba(192, 57, 43, 0.35);
+    border-radius: 6px;
+    color: #b02a1e;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .admin-page {
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    .conf-step__seances-controls {
+        align-items: flex-start;
+    }
+
+    .conf-step__bookings-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1.2rem;
+    }
+
+    .conf-step__bookings-tools {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .conf-step__bookings-actions {
+        justify-content: flex-start;
+    }
+
+    .conf-step__bookings-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .conf-step__bookings-item-actions {
+        justify-content: flex-start;
+    }
+
+    .admin-table th,
+    .admin-table td {
+        font-size: 0.85rem;
+        padding: 0.5rem;
+    }
+}

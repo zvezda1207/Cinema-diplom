@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import './Hall.css'
@@ -12,10 +12,38 @@ function Hall() {
     const [availableSeatIds, setAvailableSeatIds] = useState([]) // ID доступных мест (массив для хранения в state)
     const [bookedSeatIds, setBookedSeatIds] = useState([]) // Локально отмеченные как забронированные
     const [selectedSeats, setSelectedSeats] = useState([])
-    const [isBooking, setIsBooking] = useState(false)
+    const [bookingMessage, setBookingMessage] = useState(null)
+
+    const selectedSeatDetails = useMemo(() => {
+        if (!seance) return []
+
+        return selectedSeats
+            .map((seatId) => {
+                const seat = allSeats.find((item) => item.id === seatId)
+                if (!seat) return null
+
+                const seatType = (seat.seat_type || 'standart').toLowerCase()
+                const price =
+                    seatType === 'vip' ? Number(seance.price_vip) : Number(seance.price_standard)
+
+                return {
+                    id: seatId,
+                    row: seat.row_number,
+                    seat: seat.seat_number,
+                    type: seatType,
+                    price: Number.isFinite(price) ? price : 0,
+                }
+            })
+            .filter(Boolean)
+    }, [selectedSeats, allSeats, seance])
+
+    const selectedSeatsTotal = useMemo(
+        () => selectedSeatDetails.reduce((sum, seat) => sum + seat.price, 0),
+        [selectedSeatDetails]
+    )
     const [loading, setLoading] = useState(true)
-    const [bookingMessage, setBookingMessage] = useState(null) // Сообщение о результате бронирования
     const isLoadingDataRef = useRef(false) // Защита от множественных вызовов
+    const [film, setFilm] = useState(null)
 
     const loadSeanceData = useCallback(async () => {
         // Защита от множественных одновременных вызовов
@@ -32,8 +60,13 @@ function Hall() {
 
             // Загружаем данные сеанса
             const seanceData = await api.getSeance(seanceId)
-            // console.log('[Hall] Данные сеанса загружены:', seanceData)
             setSeance(seanceData)
+
+            if (seanceData?.film_id) {
+                const filmData = await api.getFilm(seanceData.film_id)
+                setFilm(filmData)
+            }
+            // console.log('[Hall] Данные сеанса загружены:', seanceData)
 
             if (!seanceData || !seanceData.hall_id) {
                 console.error('[Hall] Ошибка: сеанс не содержит hall_id')
@@ -131,118 +164,32 @@ function Hall() {
         })
     }
 
-    const handleBooking = useCallback(async (e) => {
-        // КРИТИЧНО: Предотвращаем перезагрузку страницы и любые другие действия
-        if (e) {
-            e.preventDefault()
-            e.stopPropagation()
-            e.stopImmediatePropagation?.()
-        }
-
-        // Дополнительная проверка: если уже идет бронирование, не делаем ничего
-        if (isBooking) {
-            console.log('[Hall] Бронирование уже в процессе, игнорируем клик')
-            return
-        }
-
-        if (selectedSeats.length === 0) {
-            setBookingMessage('⚠️ Выберите хотя бы одно место')
-            setTimeout(() => {
-                setBookingMessage(null)
-            }, 3000)
-            return
-        }
-
-        try {
-            setIsBooking(true)
-            // Убираем дубликаты на всякий случай
-            const uniqueSeats = Array.from(new Set(selectedSeats))
-            console.log('Бронирование мест:', selectedSeats, 'Уникальных:', uniqueSeats.length)
-
-            // Снимаем выделение сразу и помечаем локально как занятые, чтобы избежать "залипания" цвета
-            const seatsToBook = uniqueSeats
-            setSelectedSeats([])
-            setBookedSeatIds(prev => Array.from(new Set([...prev, ...seatsToBook])))
-
-            // Бронируем места параллельно для ускорения процесса
-            console.log(`[Hall] Начинаем бронирование ${seatsToBook.length} мест параллельно...`)
-            const bookingTimestamp = Date.now()
-
-            const bookingPromises = seatsToBook.map(async (seatId, index) => {
-                try {
-                    const bookingData = {
-                        seance_id: Number(seanceId),
-                        seat_id: seatId,
-                        user_name: 'Гость',
-                        user_phone: '+70000000000',
-                        user_email: `guest_${bookingTimestamp}_${seatId}_${index}@example.com`, // Уникальный email для каждого места
-                        qr_code_data: `guest:${bookingTimestamp}:seance:${seanceId}:seat:${seatId}`,
-                    }
-                    console.log(`[Hall] Бронируем место ${seatId}...`)
-                    await api.bookTicket(bookingData)
-                    console.log(`[Hall] Место ${seatId} успешно забронировано`)
-                    return { success: true, seatId }
-                } catch (error) {
-                    console.error(`[Hall] Ошибка бронирования места ${seatId}:`, error.message)
-                    return { success: false, seatId, error: error.message }
-                }
-            })
-
-            // Ждем завершения всех бронирований
-            const results = await Promise.all(bookingPromises)
-
-            const bookedCount = results.filter(r => r.success).length
-            const failedCount = results.filter(r => !r.success).length
-            const successfullyBookedIds = results.filter(r => r.success).map(r => r.seatId)
-            const failedSeatIds = results.filter(r => !r.success).map(r => r.seatId)
-
-            if (failedSeatIds.length > 0) {
-                console.warn(`[Hall] Не удалось забронировать места: ${failedSeatIds.join(', ')}`)
-            }
-
-            console.log(`[Hall] Бронирование завершено: успешно ${bookedCount}, ошибок ${failedCount}`)
-
-            // Обновляем только список забронированных мест без полной перезагрузки данных
-            // Это намного быстрее, чем загружать все данные заново
-            if (successfullyBookedIds.length > 0) {
-                setBookedSeatIds(prev => Array.from(new Set([...prev, ...successfullyBookedIds])))
-                setAvailableSeatIds(prev => prev.filter(id => !successfullyBookedIds.includes(id)))
-            }
-
-            // Показываем результат через состояние (быстрее и не блокирует страницу)
-            const message = failedCount === 0
-                ? `✅ Успешно забронировано мест: ${bookedCount}`
-                : `⚠️ Забронировано: ${bookedCount}, не удалось: ${failedCount}`
-
-            setBookingMessage(message)
-            console.log(`[Hall] ${message}`)
-
-            // Автоматически скрываем сообщение через 5 секунд
-            setTimeout(() => {
-                setBookingMessage(null)
-            }, 5000)
-        } catch (error) {
-            console.error('[Hall] Критическая ошибка бронирования:', error)
-            const msg = typeof error?.message === 'string' ? error.message : 'Ошибка при бронировании'
-            setBookingMessage(`❌ Ошибка: ${msg}`)
-            setTimeout(() => {
-                setBookingMessage(null)
-            }, 5000)
-        } finally {
-            setIsBooking(false)
-            // На всякий случай снимаем выделение
-            setSelectedSeats([])
-        }
-    }, [selectedSeats, seanceId, isBooking])
+    // handleBooking (legacy) удалён: текущий пользовательский поток бронирования происходит через страницу оплаты
 
     if (loading) {
         return (
-            <div className="buying">
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                    Загрузка...
-                </div>
+            <div className="hall-loading">
+                <div className="hall-loading__spinner" />
+                <span>Загружаем схему…</span>
             </div>
         )
+    }
+
+    const handleProceedToPayment = () => {
+        if (!seance || selectedSeatDetails.length === 0) {
+            setBookingMessage('⚠️ Выберите хотя бы одно место')
+            setTimeout(() => setBookingMessage(null), 3000)
+            return
+        }
+
+        navigate('/payment', {
+            state: {
+                seance,
+                film,
+                seats: selectedSeatDetails,
+                total: selectedSeatsTotal,
+            },
+        })
     }
 
     if (!seance) {
@@ -260,7 +207,7 @@ function Hall() {
         <div className="buying">
             <div className="buying__info">
                 <div className="buying__info-description">
-                    <h2 className="buying__info-title">{seance.film?.title || seance.film_id || 'Фильм'}</h2>
+                    <h2 className="buying__info-title">{film?.title || seance.film?.title || 'Фильм'}</h2>
                     <p className="buying__info-start">
                         Начало сеанса: {new Date(seance.start_time).toLocaleString('ru-RU', {
                             hour: '2-digit',
@@ -373,7 +320,13 @@ function Hall() {
                                 }
                             }
                             rows.push(
-                                <div key={rowNum} className="buying-scheme__row">
+                                <div
+                                    key={rowNum}
+                                    className="buying-scheme__row"
+                                    style={{
+                                        gridTemplateColumns: `repeat(${hall.seats_per_row}, minmax(0, 1fr))`,
+                                    }}
+                                >
                                     {rowSeats}
                                 </div>
                             )
@@ -424,14 +377,10 @@ function Hall() {
             <button
                 type="button"
                 className="acceptin-button"
-                onClick={handleBooking}
-                disabled={selectedSeats.length === 0 || isBooking}
+                onClick={handleProceedToPayment}
+                disabled={selectedSeats.length === 0}
             >
-                {isBooking ? 'Бронирование...'
-                    : selectedSeats.length > 0
-                        ? `Забронировать ${selectedSeats.length} ${selectedSeats.length === 1 ? 'место' : 'мест'}`
-                        : 'Забронировать'
-                }
+                Забронировать
             </button>
         </div>
     )

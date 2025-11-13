@@ -26,3 +26,35 @@ body:has(.client-page) {
     background-color: transparent !important;
     background-blend-mode: normal !important;
 }
+
+.client-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.client-page__content {
+    width: 100%;
+}
+
+.client-page header {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 1.4rem 1.2rem;
+}
+
+.client-page main {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 1.2rem 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.client-page main>* {
+    width: 100%;
+}

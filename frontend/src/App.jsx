@@ -4,6 +4,8 @@ import AdminLayout from './layouts/AdminLayout'
 import Home from './pages/Home'
 import Admin from './pages/Admin'
 import Hall from './pages/Hall'
+import Payment from './pages/Payment'
+import Ticket from './pages/Ticket'
 import './App.css'
 import './index.css'
 
@@ -15,6 +17,8 @@ function App() {
           <Route element={<ClientLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/hall/:seanceId" element={<Hall />} />
+            <Route path="/payment" element={<Payment />} />
+            <Route path="/ticket" element={<Ticket />} />
           </Route>
           <Route element={<AdminLayout />}>
             <Route path="/admin" element={<Admin />} />

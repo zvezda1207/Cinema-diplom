@@ -264,12 +264,15 @@ class ApiService {
         })
     }
 
-    async getTickets() {
-        return this.request('/api/v1/ticket')
-    }
-
     async deleteTicket(ticketId) {
         return this.request(`/api/v1/ticket/${ticketId}`, { method: 'DELETE' })
+    }
+
+    async setTicketArchived(ticketId, archived) {
+        return this.request(`/api/v1/ticket/${ticketId}/archive`, {
+            method: 'PATCH',
+            body: JSON.stringify({ archived })
+        })
     }
 
     async createPrice(priceData) {
@@ -294,8 +297,17 @@ class ApiService {
         return this.request(`/api/v1/price/${priceId}`, { method: 'DELETE' })
     }
 
-    async getAllBookings() {
-        return this.request('/api/v1/tickets')
+    async getAllBookings(params = {}) {
+        const queryParams = new URLSearchParams()
+        if (params.include_archived !== undefined) {
+            queryParams.set('include_archived', params.include_archived ? 'true' : 'false')
+        }
+        if (params.archived !== undefined && params.archived !== null) {
+            queryParams.set('archived', params.archived ? 'true' : 'false')
+        }
+        const queryString = queryParams.toString()
+        const endpoint = queryString ? `/api/v1/tickets?${queryString}` : '/api/v1/tickets'
+        return this.request(endpoint)
     }
 }
 

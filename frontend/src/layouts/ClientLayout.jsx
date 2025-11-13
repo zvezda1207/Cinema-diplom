@@ -8,9 +8,11 @@ function ClientLayout() {
     return (
         <div className="client-page">
             <Header />
-            <main>
-                <Outlet />
-            </main>
+            <div className="client-page__content">
+                <main>
+                    <Outlet />
+                </main>
+            </div>
         </div>
     )
 }

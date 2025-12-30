@@ -71,8 +71,8 @@ docker compose up --build
 ```
 После запуска:
 
-Backend: http://localhost:8000
-Swagger UI: http://localhost:8000/docs
+- Backend: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
 
 ---
 

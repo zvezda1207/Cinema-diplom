@@ -62,15 +62,15 @@
 ```bash
 git clone https://github.com/zvezda1207/Cinema-diplom.git
 cd Cinema-diplom
+```
 
 ### 2. Запуск через Docker Compose
 
 ```bash
 docker compose up --build
+```
 После запуска:
-
 Backend: http://localhost:8000
-
 Swagger UI: http://localhost:8000/docs
 
 ---

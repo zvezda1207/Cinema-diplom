@@ -70,6 +70,7 @@ cd Cinema-diplom
 docker compose up --build
 ```
 После запуска:
+
 Backend: http://localhost:8000
 Swagger UI: http://localhost:8000/docs
 

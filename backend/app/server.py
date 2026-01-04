@@ -5,7 +5,7 @@ import os
 import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -474,7 +474,7 @@ async def delete_seance(seance_id: int, session: SessionDependency, token: Token
 # Билеты
 @app.post('/api/v1/ticket', tags=['ticket'], response_model=CreateTicketResponse)
 async def create_ticket(ticket: CreateTicketRequest, session: SessionDependency, token: TokenDependency):
-    if token.user.role != 'user':
+    if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
     ticket_dict = ticket.model_dump(exclude_unset=True)
     ticket_orm_obj = models.Ticket(**ticket_dict)
@@ -486,7 +486,7 @@ async def update_ticket(ticket_id: int, ticket: UpdateTicketRequest, session: Se
     ticket_orm_obj = await crud.get_item_by_id(session, models.Ticket, ticket_id)
     if ticket_orm_obj is None:
         raise HTTPException(404, 'Ticket not found')
-    if token.user.role != 'user':
+    if token.user.role != 'admin':
         raise HTTPException(403, 'Insufficient privileges')
     ticket_dict = ticket.model_dump(exclude_unset=True)
     for key, value in ticket_dict.items():
